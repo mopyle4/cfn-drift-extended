@@ -1,0 +1,51 @@
+name: "cfn-drift-extended"
+description: "Detect additive drift in CloudFormation-managed IAM roles"
+branding:
+  icon: "shield"
+  color: "orange"
+
+inputs:
+  stack-prefix:
+    description: "CloudFormation stack name prefix to audit"
+    required: true
+  region:
+    description: "AWS region to scan"
+    required: false
+    default: "us-east-1"
+  fail-on-drift:
+    description: "Fail the action if drift is detected"
+    required: false
+    default: "true"
+  output-json:
+    description: "Path to write JSON report"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - name: Install cfn-drift-extended
+      shell: bash
+      run: pip install "${{ github.action_path }}"
+
+    - name: Run audit
+      shell: bash
+      env:
+        INPUT_STACK_PREFIX: ${{ inputs.stack-prefix }}
+        INPUT_REGION: ${{ inputs.region }}
+        INPUT_FAIL_ON_DRIFT: ${{ inputs.fail-on-drift }}
+        INPUT_OUTPUT_JSON: ${{ inputs.output-json }}
+      run: |
+        ARGS="audit --stack-prefix ${INPUT_STACK_PREFIX} --region ${INPUT_REGION}"
+        if [ "${INPUT_FAIL_ON_DRIFT}" = "false" ]; then
+          ARGS="${ARGS} --no-fail-on-drift"
+        fi
+        if [ -n "${INPUT_OUTPUT_JSON}" ]; then
+          ARGS="${ARGS} --output-json ${INPUT_OUTPUT_JSON}"
+        fi
+        cfn-drift-extended ${ARGS}

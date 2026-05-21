@@ -110,7 +110,7 @@ def main() -> None:
     default=None,
     help=(
         "Comma-separated list of services to audit. "
-        "Options: iam,sg,sns,sqs,eventbridge. Default: all."
+        "Options: iam,sg,sns,sqs,eventbridge,lambda,s3,dynamodb. Default: all."
     ),
 )
 def audit(

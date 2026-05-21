@@ -26,6 +26,18 @@ class DriftType(StrEnum):
     SNS_SUBSCRIPTION_ADDED = "sns_subscription_added"
     # EventBridge
     EVENTBRIDGE_RULE_ADDED = "eventbridge_rule_added"
+    # Lambda
+    LAMBDA_ENV_VAR_ADDED = "lambda_env_var_added"
+    LAMBDA_LAYER_ADDED = "lambda_layer_added"
+    LAMBDA_PERMISSION_ADDED = "lambda_permission_added"
+    # S3
+    S3_POLICY_STATEMENT_ADDED = "s3_policy_statement_added"
+    S3_LIFECYCLE_RULE_ADDED = "s3_lifecycle_rule_added"
+    S3_CORS_RULE_ADDED = "s3_cors_rule_added"
+    # DynamoDB
+    DYNAMODB_GSI_ADDED = "dynamodb_gsi_added"
+    DYNAMODB_SCALING_TARGET_ADDED = "dynamodb_scaling_target_added"
+    DYNAMODB_SCALING_POLICY_ADDED = "dynamodb_scaling_policy_added"
 
 
 class Severity(StrEnum):

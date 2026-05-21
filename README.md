@@ -56,9 +56,9 @@ CloudFormation drift detection only catches modifications or deletions to resour
 | 📨 **SNS Topics** | Extra policy statements, extra subscriptions | HIGH / MEDIUM |
 | 📋 **SQS Queues** | Extra resource policy statements | HIGH |
 | ⚡ **EventBridge** | Extra rules on CFN-managed event buses | MEDIUM |
-| 🔜 Lambda | Environment variables, layers, resource policies | *Coming soon* |
-| 🔜 S3 | Bucket policies, lifecycle rules, CORS | *Coming soon* |
-| 🔜 DynamoDB | GSIs, auto-scaling policies | *Coming soon* |
+| 🔧 **Lambda** | Extra environment variables, extra layers, extra resource-based permissions | HIGH / MEDIUM |
+| 🪣 **S3** | Extra bucket policy statements, extra lifecycle rules, extra CORS rules | HIGH / MEDIUM / LOW |
+| 🗄️ **DynamoDB** | Extra Global Secondary Indexes, extra auto-scaling targets/policies | MEDIUM |
 
 ---
 
@@ -131,6 +131,14 @@ This tool uses **read-only** AWS API calls exclusively. No write operations are 
         "events:DescribeEventBus",
         "events:ListRules",
         "events:ListTargetsByRule",
+        "lambda:GetFunctionConfiguration",
+        "lambda:GetPolicy",
+        "s3:GetBucketPolicy",
+        "s3:GetBucketLifecycleConfiguration",
+        "s3:GetBucketCors",
+        "dynamodb:DescribeTable",
+        "application-autoscaling:DescribeScalableTargets",
+        "application-autoscaling:DescribeScalingPolicies",
         "sts:GetCallerIdentity"
       ],
       "Resource": "*"

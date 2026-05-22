@@ -16,17 +16,26 @@ from botocore.exceptions import ClientError
 
 from cfn_drift_extended import __version__
 from cfn_drift_extended.collectors.cfn_collector import CfnCollector, ExpectedRoleState
+from cfn_drift_extended.collectors.cfn_dynamodb_extractor import CfnDynamoDBExtractor
 from cfn_drift_extended.collectors.cfn_eventbridge_extractor import CfnEventBridgeExtractor
+from cfn_drift_extended.collectors.cfn_lambda_extractor import CfnLambdaExtractor
+from cfn_drift_extended.collectors.cfn_s3_extractor import CfnS3Extractor
 from cfn_drift_extended.collectors.cfn_sg_extractor import CfnSgExtractor
 from cfn_drift_extended.collectors.cfn_sns_sqs_extractor import CfnSnsSqsExtractor
+from cfn_drift_extended.collectors.dynamodb_collector import DynamoDBCollector
 from cfn_drift_extended.collectors.eventbridge_collector import EventBridgeCollector
 from cfn_drift_extended.collectors.iam_collector import IamCollector
+from cfn_drift_extended.collectors.lambda_collector import LambdaCollector
+from cfn_drift_extended.collectors.s3_collector import S3Collector
 from cfn_drift_extended.collectors.sg_collector import SgCollector
 from cfn_drift_extended.collectors.sns_sqs_collector import SnsSqsCollector
+from cfn_drift_extended.comparators.dynamodb_comparator import DynamoDBComparator
 from cfn_drift_extended.comparators.eventbridge_comparator import (
     EventBridgeComparator,
 )
 from cfn_drift_extended.comparators.iam_comparator import IamComparator
+from cfn_drift_extended.comparators.lambda_comparator import LambdaComparator
+from cfn_drift_extended.comparators.s3_comparator import S3Comparator
 from cfn_drift_extended.comparators.sg_comparator import SgComparator
 from cfn_drift_extended.comparators.sns_sqs_comparator import (
     SnsSqsComparator,
@@ -44,7 +53,7 @@ _BOTO_CONFIG = Config(
 )
 
 # All supported service names
-ALL_SERVICES = frozenset({"iam", "sg", "sns", "sqs", "eventbridge"})
+ALL_SERVICES = frozenset({"iam", "sg", "sns", "sqs", "eventbridge", "lambda", "s3", "dynamodb"})
 
 
 # Paths that indicate AWS service-linked roles (not user-managed)
@@ -107,6 +116,21 @@ class Auditor:
             )
             self._eventbridge_comparator = EventBridgeComparator()
             self._eventbridge_extractor = CfnEventBridgeExtractor()
+
+        if "lambda" in self._services:
+            self._lambda_collector = LambdaCollector(region=region, session=self._session)
+            self._lambda_comparator = LambdaComparator()
+            self._lambda_extractor = CfnLambdaExtractor()
+
+        if "s3" in self._services:
+            self._s3_collector = S3Collector(region=region, session=self._session)
+            self._s3_comparator = S3Comparator()
+            self._s3_extractor = CfnS3Extractor()
+
+        if "dynamodb" in self._services:
+            self._dynamodb_collector = DynamoDBCollector(region=region, session=self._session)
+            self._dynamodb_comparator = DynamoDBComparator()
+            self._dynamodb_extractor = CfnDynamoDBExtractor()
 
     def audit_stacks(
         self,
@@ -197,9 +221,9 @@ class Auditor:
             errors.extend(iam_errors)
             resource_count += iam_count
 
-        # For SG, SNS/SQS, EventBridge we need the template and physical IDs
+        # For SG, SNS/SQS, EventBridge, Lambda, S3, DynamoDB we need the template and physical IDs
         needs_template = bool(
-            {"sg", "sns", "sqs", "eventbridge"} & self._services
+            {"sg", "sns", "sqs", "eventbridge", "lambda", "s3", "dynamodb"} & self._services
         )
         if not needs_template:
             return audits, errors, resource_count
@@ -250,6 +274,33 @@ class Auditor:
             audits.extend(eb_audits)
             errors.extend(eb_errors)
             resource_count += eb_count
+
+        # Lambda audit
+        if "lambda" in self._services:
+            lambda_audits, lambda_errors, lambda_count = self._audit_lambda(
+                resources, stack_name, physical_ids
+            )
+            audits.extend(lambda_audits)
+            errors.extend(lambda_errors)
+            resource_count += lambda_count
+
+        # S3 audit
+        if "s3" in self._services:
+            s3_audits, s3_errors, s3_count = self._audit_s3(
+                resources, stack_name, physical_ids
+            )
+            audits.extend(s3_audits)
+            errors.extend(s3_errors)
+            resource_count += s3_count
+
+        # DynamoDB audit
+        if "dynamodb" in self._services:
+            ddb_audits, ddb_errors, ddb_count = self._audit_dynamodb(
+                resources, stack_name, physical_ids
+            )
+            audits.extend(ddb_audits)
+            errors.extend(ddb_errors)
+            resource_count += ddb_count
 
         return audits, errors, resource_count
 
@@ -427,6 +478,122 @@ class Auditor:
                 errors.append(msg)
 
         return audits, errors, len(expected_buses)
+
+    def _audit_lambda(
+        self,
+        resources: dict[str, Any],
+        stack_name: str,
+        physical_ids: dict[str, str],
+    ) -> tuple[list[ResourceAudit], list[str], int]:
+        """Audit Lambda functions for a stack."""
+        expected_functions = self._lambda_extractor.extract_functions(
+            resources, stack_name, physical_ids
+        )
+        if not expected_functions:
+            return [], [], 0
+
+        audits: list[ResourceAudit] = []
+        errors: list[str] = []
+
+        for expected in expected_functions:
+            try:
+                actual = self._lambda_collector.get_function_state(
+                    expected.function_name
+                )
+                if actual is None:
+                    logger.warning(
+                        "Lambda function '%s' in stack '%s' not found — skipping",
+                        expected.function_name,
+                        stack_name,
+                    )
+                    continue
+                audit = self._lambda_comparator.compare(expected, actual)
+                audits.append(audit)
+            except Exception as e:
+                msg = (
+                    f"Error auditing Lambda function '{expected.function_name}' "
+                    f"in stack '{stack_name}': {e}"
+                )
+                logger.error(msg)
+                errors.append(msg)
+
+        return audits, errors, len(expected_functions)
+
+    def _audit_s3(
+        self,
+        resources: dict[str, Any],
+        stack_name: str,
+        physical_ids: dict[str, str],
+    ) -> tuple[list[ResourceAudit], list[str], int]:
+        """Audit S3 buckets for a stack."""
+        expected_buckets = self._s3_extractor.extract_buckets(
+            resources, stack_name, physical_ids
+        )
+        if not expected_buckets:
+            return [], [], 0
+
+        audits: list[ResourceAudit] = []
+        errors: list[str] = []
+
+        for expected in expected_buckets:
+            try:
+                actual = self._s3_collector.get_bucket_state(expected.bucket_name)
+                if actual is None:
+                    logger.warning(
+                        "S3 bucket '%s' in stack '%s' not found — skipping",
+                        expected.bucket_name,
+                        stack_name,
+                    )
+                    continue
+                audit = self._s3_comparator.compare(expected, actual)
+                audits.append(audit)
+            except Exception as e:
+                msg = (
+                    f"Error auditing S3 bucket '{expected.bucket_name}' "
+                    f"in stack '{stack_name}': {e}"
+                )
+                logger.error(msg)
+                errors.append(msg)
+
+        return audits, errors, len(expected_buckets)
+
+    def _audit_dynamodb(
+        self,
+        resources: dict[str, Any],
+        stack_name: str,
+        physical_ids: dict[str, str],
+    ) -> tuple[list[ResourceAudit], list[str], int]:
+        """Audit DynamoDB tables for a stack."""
+        expected_tables = self._dynamodb_extractor.extract_tables(
+            resources, stack_name, physical_ids
+        )
+        if not expected_tables:
+            return [], [], 0
+
+        audits: list[ResourceAudit] = []
+        errors: list[str] = []
+
+        for expected in expected_tables:
+            try:
+                actual = self._dynamodb_collector.get_table_state(expected.table_name)
+                if actual is None:
+                    logger.warning(
+                        "DynamoDB table '%s' in stack '%s' not found — skipping",
+                        expected.table_name,
+                        stack_name,
+                    )
+                    continue
+                audit = self._dynamodb_comparator.compare(expected, actual)
+                audits.append(audit)
+            except Exception as e:
+                msg = (
+                    f"Error auditing DynamoDB table '{expected.table_name}' "
+                    f"in stack '{stack_name}': {e}"
+                )
+                logger.error(msg)
+                errors.append(msg)
+
+        return audits, errors, len(expected_tables)
 
     def _resolve_physical_ids(
         self, stack_name: str, resources: dict[str, Any]

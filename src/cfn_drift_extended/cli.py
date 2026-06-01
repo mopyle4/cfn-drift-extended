@@ -335,13 +335,13 @@ def orphans(
         sys.exit(2)
 
     # Console output
-    _render_orphan_report(report)
+    console = ConsoleReporter()
+    console.render_orphans(report)
 
     # JSON output
     if output_json:
-        json_str = report.model_dump_json(indent=2)
-        output_json.parent.mkdir(parents=True, exist_ok=True)
-        output_json.write_text(json_str, encoding="utf-8")
+        json_reporter = JsonReporter()
+        json_reporter.render_orphans(report, output_path=output_json)
         click.echo(f"\nJSON report written to: {output_json}")
 
     # Report non-fatal errors
@@ -355,35 +355,3 @@ def orphans(
     # Exit code for CI/CD
     if fail_on_orphans and report.has_orphans:
         sys.exit(1)
-
-
-def _render_orphan_report(report) -> None:
-    """Render orphan report to the console."""
-    click.secho("═" * 60, fg="cyan")
-    click.secho("  cfn-drift-extended — Orphaned Resource Report", fg="cyan", bold=True)
-    click.secho("═" * 60, fg="cyan")
-    click.echo(f"  Resources in managed index: {report.resources_scanned}")
-    click.echo(f"  Orphans found:             {report.orphans_found}")
-
-    if not report.has_orphans:
-        click.secho("\n✓ No orphaned resources detected.", fg="green", bold=True)
-        return
-
-    click.secho(
-        f"\n⚠ Found {report.orphans_found} orphaned resource(s):",
-        fg="red",
-        bold=True,
-    )
-    click.echo()
-
-    _severity_colors = {"high": "red", "medium": "yellow", "low": "blue"}
-
-    for finding in report.findings:
-        color = _severity_colors.get(finding.severity.value, "white")
-        severity_label = finding.severity.value.upper()
-        click.secho(f"  [{severity_label}] ", fg=color, bold=True, nl=False)
-        click.echo(f"{finding.resource_id}")
-        click.echo(f"         {finding.description}")
-        if finding.created_date:
-            click.echo(f"         Created: {finding.created_date}")
-        click.echo()

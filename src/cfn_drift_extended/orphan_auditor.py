@@ -16,6 +16,11 @@ from cfn_drift_extended import __version__
 from cfn_drift_extended.collectors.cfn_managed_index import (
     build_managed_resource_index,
 )
+from cfn_drift_extended.collectors.iam_orphan_collector import IamOrphanCollector
+from cfn_drift_extended.collectors.lambda_orphan_collector import (
+    LambdaOrphanCollector,
+)
+from cfn_drift_extended.collectors.sg_orphan_collector import SgOrphanCollector
 from cfn_drift_extended.collectors.sqs_sns_orphan_collector import (
     SqsSnsOrphanCollector,
 )
@@ -129,17 +134,55 @@ class OrphanAuditor:
         """Build a mapping of service name → detection callable."""
         tasks: dict[str, callable] = {}
 
-        if "sqs" in self._services:
-            collector = SqsSnsOrphanCollector(
+        if "iam" in self._services:
+            iam_collector = IamOrphanCollector(
                 session=self._session, region=self._region
             )
-            tasks["sqs"] = lambda c=collector: c.detect_orphaned_queues(managed_index)
+            tasks["iam"] = (
+                lambda collector=iam_collector: collector.detect_orphaned_roles(
+                    managed_index
+                )
+            )
+
+        if "sg" in self._services:
+            sg_collector = SgOrphanCollector(
+                session=self._session, region=self._region
+            )
+            tasks["sg"] = (
+                lambda collector=sg_collector: (
+                    collector.detect_orphaned_security_groups(managed_index)
+                )
+            )
+
+        if "lambda" in self._services:
+            lambda_collector = LambdaOrphanCollector(
+                session=self._session, region=self._region
+            )
+            tasks["lambda"] = (
+                lambda collector=lambda_collector: (
+                    collector.detect_orphaned_functions(managed_index)
+                )
+            )
+
+        if "sqs" in self._services:
+            sqs_collector = SqsSnsOrphanCollector(
+                session=self._session, region=self._region
+            )
+            tasks["sqs"] = (
+                lambda collector=sqs_collector: collector.detect_orphaned_queues(
+                    managed_index
+                )
+            )
 
         if "sns" in self._services:
-            collector = SqsSnsOrphanCollector(
+            sns_collector = SqsSnsOrphanCollector(
                 session=self._session, region=self._region
             )
-            tasks["sns"] = lambda c=collector: c.detect_orphaned_topics(managed_index)
+            tasks["sns"] = (
+                lambda collector=sns_collector: collector.detect_orphaned_topics(
+                    managed_index
+                )
+            )
 
         return tasks
 

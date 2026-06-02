@@ -61,6 +61,16 @@ CloudFormation drift detection only catches modifications or deletions to resour
 | 🪣 **S3** | Extra bucket policy statements, extra lifecycle rules, extra CORS rules | HIGH / MEDIUM / LOW |
 | 🗄️ **DynamoDB** | Extra Global Secondary Indexes, extra auto-scaling targets/policies | MEDIUM |
 
+### Orphan provenance buckets
+
+When orphan detection runs (see [Orphaned Resource Detection](#-orphaned-resource-detection) below), each finding is classified by how the resource came to exist:
+
+| Bucket | Meaning | Severity |
+|--------|---------|----------|
+| `cfn_orphan_deleted_stack` | Retained when its CloudFormation stack was deleted (`DeletionPolicy: Retain`) — high-priority cleanup. | **HIGH** |
+| `non_iac` | No CloudFormation record — created via console / CLI / SDK directly. Informational. | service default |
+| `unknown` | Default fallback when neither signal is conclusive. | service default |
+
 ---
 
 ## 📦 Installation
@@ -151,6 +161,8 @@ Provenance is resolved by two complementary signals:
 2. **`cloudformation:DescribeStackResources --physical-resource-id`** as a fallback for active-stack resolution, plus a bulk `resourcegroupstaggingapi:GetResources` call for resource types where the reserved `aws:cloudformation:stack-name` tag does propagate (CloudWatch log groups, S3 buckets, SSM parameters — note that IAM roles, SQS queues, SG, Lambda, and SNS topics do *not* carry the reserved tag, verified empirically).
 
 `originating_stack_name` is populated on every CFN-orphan finding so you can trace each resource back to the stack that left it behind.
+
+> ⚠️ **90-day stack retention window (AWS platform limitation).** AWS retains `DELETE_COMPLETE` stack metadata for approximately 90 days. Resources orphaned by stacks deleted more than 90 days ago can no longer be queried via the CloudFormation API and will classify as `unknown` rather than `cfn_orphan_deleted_stack` — they're indistinguishable from console-created resources at that point. This is an AWS limitation, not a tool limitation. **Run orphan detection regularly** (e.g., weekly in CI) so deleted-stack residue is caught while still attributable.
 
 ### Live verification
 

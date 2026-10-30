@@ -5,7 +5,7 @@ Detect **additive drift** and **orphaned resources** in CloudFormation-managed A
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
 [![Tests](https://img.shields.io/badge/Tests-242%20passing-brightgreen.svg)](#-development)
-[![PyPI](https://img.shields.io/badge/PyPI-v1.1.0-blue.svg)](https://pypi.org/project/cfn-drift-extended/)
+[![PyPI](https://img.shields.io/pypi/v/cfn-drift-extended.svg)](https://pypi.org/project/cfn-drift-extended/)
 
 ## 🔍 The Problem
 
@@ -138,7 +138,6 @@ This tool uses **read-only** AWS API calls exclusively. No write operations are 
         "iam:ListRolePolicies",
         "iam:ListAttachedRolePolicies",
         "ec2:DescribeSecurityGroups",
-        "ec2:DescribeSecurityGroupRules",
         "sqs:GetQueueAttributes",
         "sns:GetTopicAttributes",
         "sns:ListSubscriptionsByTopic",

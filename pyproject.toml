@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "cfn-drift-extended"
-version = "1.1.1"
+version = "1.1.2"
 description = "Detect additive drift and orphaned resources in CloudFormation-managed accounts, complementing native drift detection"
 readme = "README.md"
 license = "MIT"

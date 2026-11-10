@@ -4,7 +4,7 @@ Detect **additive drift** and **orphaned resources** in CloudFormation-managed A
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/Python-3.11%2B-blue.svg)](https://www.python.org/)
-[![Tests](https://img.shields.io/badge/Tests-242%20passing-brightgreen.svg)](#-development)
+[![Tests](https://img.shields.io/badge/Tests-248%20passing-brightgreen.svg)](#-development)
 [![PyPI](https://img.shields.io/pypi/v/cfn-drift-extended.svg)](https://pypi.org/project/cfn-drift-extended/)
 
 ## 🔍 The Problem
@@ -37,6 +37,8 @@ CloudFormation drift detection compares the properties your template declares ag
 | **Lambda** | Extra environment variables, extra layers, extra resource policies | MEDIUM |
 | **S3** | Extra bucket policy statements, extra lifecycle rules, extra CORS rules | MEDIUM |
 | **DynamoDB** | Extra GSIs, extra scaling targets, extra scaling policies | MEDIUM |
+
+**Security group default egress:** when a template declares no inline `SecurityGroupEgress` (standalone `AWS::EC2::SecurityGroupEgress` resources don't count), the EC2 default allow-all egress rule (`-1` to `0.0.0.0/0` or `::/0`) is expected and not reported; if the template declares inline egress, that default rule is reported as drift.
 
 ### Orphan detection (`orphans`)
 
@@ -325,7 +327,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 
-# Run tests (242 tests)
+# Run tests (248 tests)
 pytest --cov=cfn_drift_extended --cov-report=term-missing
 
 # Lint

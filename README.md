@@ -128,6 +128,8 @@ For accounts with thousands of deleted stacks, the `--max-deleted-stacks` flag (
 
 The `--max-cfn-workers` flag (default: 5) controls separate concurrency for CloudFormation API calls, independent from the detector thread pool (`--max-workers`).
 
+> ⚠️ **90-day stack retention window (AWS platform limitation).** AWS retains `DELETE_COMPLETE` stack metadata for approximately 90 days. Resources orphaned by stacks deleted more than 90 days ago can no longer be queried via the CloudFormation API and will classify as `unknown` rather than `cfn_orphan_deleted_stack` — they're indistinguishable from console-created resources at that point. This is an AWS limitation, not a tool limitation. **Run orphan detection regularly** (e.g., weekly in CI) so deleted-stack residue is caught while still attributable.
+
 ## 🔒 Required IAM Permissions (Least Privilege)
 
 This tool uses **read-only** AWS API calls exclusively. No write operations are performed.
